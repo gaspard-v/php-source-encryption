@@ -119,6 +119,48 @@ trait Singleton
     }
 }
 
+// TODO
+// trait ClientDataValidator
+// {
+//     /**
+//      * @return ClassObjTyping[]
+//      */
+//     abstract private function getClassObjs(): array;
+//     final public function validate(array $clientArgs)
+//     {
+//         $classObjs = $this->getClassObjs();
+//         foreach ($classObjs as $obj => $classObjOptional) {
+//             $classObj
+//         }
+//     }
+// }
+
+abstract class Typing
+{
+    static public string $string = "string";
+    static public string $boolean = "boolean";
+    static public string $integer = "integer";
+    static public string $double = "double";
+    static public string $array = "array";
+    static public string $object = "object";
+    static public string $resource = "resource";
+    static public string $resource_closed = "resource (closed)";
+    static public string $NULL = "NULL";
+    static public string $unknown_type = "unknown type";
+}
+
+abstract class ClassObjOptional
+{
+    static public string $optional = "optional";
+    static public string $mandatory = "mandatory";
+}
+
+class ClassObjTyping
+{
+    public string $type;
+    public string $optional;
+}
+
 class OpensslDecryptor implements Decryptor
 {
     use Singleton;
@@ -291,4 +333,3 @@ class Executor
     {
     }
 }
-

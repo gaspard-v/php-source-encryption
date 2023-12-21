@@ -105,7 +105,6 @@ class MissingRequirementException extends Exception
 
 interface Decryptor
 {
-    function __construct(string $lol);
     /**
      * @param string $data
      * @return string|false
@@ -153,6 +152,7 @@ trait Singleton
 
 class OpensslDecryptor implements Decryptor
 {
+    use Singleton;
     /**
      * @readonly
      * @var string
@@ -169,29 +169,25 @@ class OpensslDecryptor implements Decryptor
      */
     private $tag;
     /**
-     * @readonly
      * @var int
      */
     private $options = 0;
     /**
-     * @readonly
      * @var string
      */
     private $iv = "";
     /**
-     * @readonly
      * @var string
      */
     private $aad = "";
-    use Singleton;
-    private function __construct(string $cipher_algo, string $passphrase, ?string $tag, int $options = 0, string $iv = "", string $aad = "")
+    private function __construct(array $args)
     {
-        $this->cipher_algo = $cipher_algo;
-        $this->passphrase = $passphrase;
-        $this->tag = $tag;
-        $this->options = $options;
-        $this->iv = $iv;
-        $this->aad = $aad;
+        $this->cipher_algo = $args["cipher_algo"];
+        $this->passphrase = $args["passphrase"];
+        $optArgs = ["tag", "options", "iv", "aad"];
+        foreach ($optArgs as $optArg) {
+            $this->$optArg = $args[$optArg];
+        }
     }
     /**
      * @param string $data
@@ -213,6 +209,7 @@ class OpensslDecryptor implements Decryptor
 
 class McryptDecryptor implements Decryptor
 {
+    use Singleton;
     /**
      * @readonly
      * @var string
@@ -229,13 +226,15 @@ class McryptDecryptor implements Decryptor
      * @var string|null
      */
     private $iv;
-    use Singleton;
-    private function __construct(string $cipher, string $key, $mode, ?string $iv = null)
+    private function __construct(array $args)
     {
-        $this->cipher = $cipher;
-        $this->key = $key;
-        $this->mode = $mode;
-        $this->iv = $iv;
+        $this->cipher = $args["cipher"];
+        $this->key = $args["key"];
+        $this->mode = $args["mode"];
+        $optArgs = ["iv"];
+        foreach ($optArgs as $optArg) {
+            $this->$optArg = $args[$optArg];
+        }
     }
     /**
      * @param string $data
@@ -331,11 +330,10 @@ class GetPHP
     /**
      * @var array<DecryptorTester> $decryptorTesters
      */
-    private $decryptorTesters = [
-        TestPhpOpenssl::getInstance(),
-    ];
+    private $decryptorTesters = [];
     private function __construct()
     {
+        $this->decryptorTesters[] = TestPhpOpenssl::getInstance();
     }
     public function getDecryptor(): string
     {
@@ -357,7 +355,9 @@ class GetPHP
 
 class Executor
 {
+    use Singleton;
     /**
+     * @readonly
      * @var \Decryptor
      */
     private $decryptor;
@@ -365,14 +365,8 @@ class Executor
      * @var mixed[]
      */
     private $clientData = [];
-    use Singleton;
-
-    private function __construct(
-        Decryptor $decryptor,
-        array $clientData = []
-    ) {
-        $this->decryptor = $decryptor;
-        $this->clientData = $clientData;
+    private function __construct()
+    {
         $rawClientData = file_get_contents('php://input');
         $this->clientData = json_decode(
             $rawClientData,
@@ -384,9 +378,10 @@ class Executor
             throw new \Exception(json_last_error_msg());
         }
         $decryptorPtr = GetPHP::getInstance()->getDecryptor();
-        $this->decryptor = $decryptorPtr::getInstance(...$this->clientData);
+        $this->decryptor = $decryptorPtr::getInstance($this->clientData);
     }
     private function exec($encryptedPhpString)
     {
     }
 }
+

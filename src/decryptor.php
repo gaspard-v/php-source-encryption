@@ -55,16 +55,46 @@ class UnavailableCipherException extends Exception {
 }
 
 interface Decryptor {
+    function __construct(string $lol);
     public function decrypt(string $data): string|false;
 }
 
+interface Tester {
+
+    /**
+     * Launch all tests
+     * 
+     * @return void
+     * @throws Exception
+     */
+    public function launch(): void;
+}
+
+interface DecryptorTester {
+    public function getDecryptor(): string;
+}
+
+trait Singleton {
+    private static array $instances = [];
+    private function __construct() {}
+    final protected function  __clone() {}
+    final public static function getInstance(...$args): self
+    {
+        $className = static::class;
+        if(!isset(self::$instances[$className]))
+            self::$instances[$className] = new $className(...$args);
+        return self::$instances[$className];
+    }
+}
+
 class OpensslDecryptor implements Decryptor {
+    use Singleton;
     private int $options = 0;
     private string $iv = "";
 
     private ?string $tag = null;
     private string $aad = "";
-    public function __construct(
+    private function __construct(
         private string $cipher_algo, 
         private string $passphrase) {
             
@@ -102,10 +132,10 @@ class OpensslDecryptor implements Decryptor {
 }
 
 class McryptDecryptor implements Decryptor {
-    public function __construct(
+    use Singleton;
+    private function __construct(
         private string $cipher,
         private string $key,
-        private string $data,
         private $mode,
         private ?string $iv = null
     ) {}
@@ -113,15 +143,15 @@ class McryptDecryptor implements Decryptor {
         return mcrypt_decrypt(
             $this->cipher,
             $this->key,
-            $this->data,
+            $data,
             $this->mode,
             $this->iv
         );
     }
 }
 
-class TestPhpOpenssl {
-    private static $instances = array();
+class TestPhpOpenssl implements Tester, DecryptorTester {
+    use Singleton;
     private array $opensslFunctions = [
         "openssl_decrypt",
         "openssl_get_cipher_methods"
@@ -165,10 +195,32 @@ class TestPhpOpenssl {
             throw new MultipleExceptions($exceptionArray);
 
     }
-    final public static function getInstance() {
-        $c = get_called_class();
-        if(!isset(self::$instances[$c]))
-            self::$instances[$c] = new $c;
-        return self::$instances[$c];
+    public function getDecryptor(): string {
+        return OpensslDecryptor::class;
     }
 }
+
+
+class GetPHP {
+    use Singleton;
+    private array $decryptorTesters = [];
+    private function __construct() {
+        $this->decryptorTesters[] = TestPhpOpenssl::getInstance();
+    }
+    public function getDecryptor(): string {
+        foreach($this->decryptorTesters as $tester) {
+            try {
+                $tester->launch();
+                return $tester->getDecryptor();
+            } catch (Exception $e) {
+                continue;
+            }
+        }
+        throw new Exception("non");
+    }
+}
+
+// $phpInstance = GetPHP::getInstance();
+// $dec = $phpInstance->getDecryptor();
+// $dec::getInstance();
+// var_dump($dec);

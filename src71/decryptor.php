@@ -3,11 +3,17 @@
 declare(strict_types=1);
 class MultipleExceptions extends Exception
 {
+    /**
+     * @readonly
+     * @var mixed[]
+     */
+    private $exceptions;
     public function __construct(
-        private readonly array $exceptions,
+        array $exceptions,
         int $code = 0,
         Throwable $previous = null
     ) {
+        $this->exceptions = $exceptions;
         $message = $this->createMessage();
         parent::__construct($message, $code, $previous);
     }
@@ -32,11 +38,17 @@ class MultipleExceptions extends Exception
 }
 class UncallableFunctionException extends Exception
 {
+    /**
+     * @readonly
+     * @var string
+     */
+    private $uncallableFunction;
     public function __construct(
-        private readonly string $uncallableFunction,
+        string $uncallableFunction,
         int $code = 0,
         Throwable $previous = null
     ) {
+        $this->uncallableFunction = $uncallableFunction;
         $message = "Function \"{$this->uncallableFunction}\" is not callable";
         parent::__construct($message, $code, $previous);
     }
@@ -49,11 +61,17 @@ class UncallableFunctionException extends Exception
 
 class UnavailableCipherException extends Exception
 {
+    /**
+     * @readonly
+     * @var string
+     */
+    private $unavailableCipher;
     public function __construct(
-        private readonly string $unavailableCipher,
+        string $unavailableCipher,
         int $code = 0,
         Throwable $previous = null
     ) {
+        $this->unavailableCipher = $unavailableCipher;
         $message = "Cipher \"{$this->unavailableCipher}\" is not available";
         parent::__construct($message, $code, $previous);
     }
@@ -65,11 +83,17 @@ class UnavailableCipherException extends Exception
 
 class MissingRequirementException extends Exception
 {
+    /**
+     * @readonly
+     * @var string
+     */
+    private $missingRequirement;
     public function __construct(
-        private readonly string $missingRequirement,
+        string $missingRequirement,
         int $code = 0,
         Throwable $previous = null
     ) {
+        $this->missingRequirement = $missingRequirement;
         $message = "Requirement \"{$this->missingRequirement}\" is missing";
         parent::__construct($message, $code, $previous);
     }
@@ -82,7 +106,11 @@ class MissingRequirementException extends Exception
 interface Decryptor
 {
     function __construct(string $lol);
-    public function decrypt(string $data): string|false;
+    /**
+     * @param string $data
+     * @return string|false
+     */
+    public function decrypt($data);
 }
 
 interface Tester
@@ -103,7 +131,10 @@ interface DecryptorTester extends Tester
 
 trait Singleton
 {
-    private static array $instances = [];
+    /**
+     * @var mixed[]
+     */
+    private static $instances = [];
     private function __construct()
     {
     }
@@ -122,17 +153,51 @@ trait Singleton
 
 class OpensslDecryptor implements Decryptor
 {
+    /**
+     * @readonly
+     * @var string
+     */
+    private $cipher_algo;
+    /**
+     * @readonly
+     * @var string
+     */
+    private $passphrase;
+    /**
+     * @readonly
+     * @var string|null
+     */
+    private $tag;
+    /**
+     * @readonly
+     * @var int
+     */
+    private $options = 0;
+    /**
+     * @readonly
+     * @var string
+     */
+    private $iv = "";
+    /**
+     * @readonly
+     * @var string
+     */
+    private $aad = "";
     use Singleton;
-    private function __construct(
-        private readonly string $cipher_algo,
-        private readonly string $passphrase,
-        private readonly ?string $tag,
-        private readonly int $options = 0,
-        private readonly string $iv = "",
-        private readonly string $aad = ""
-    ) {
+    private function __construct(string $cipher_algo, string $passphrase, ?string $tag, int $options = 0, string $iv = "", string $aad = "")
+    {
+        $this->cipher_algo = $cipher_algo;
+        $this->passphrase = $passphrase;
+        $this->tag = $tag;
+        $this->options = $options;
+        $this->iv = $iv;
+        $this->aad = $aad;
     }
-    final public function decrypt(string $data): string|false
+    /**
+     * @param string $data
+     * @return string|false
+     */
+    final public function decrypt($data)
     {
         return openssl_decrypt(
             $data,
@@ -148,15 +213,35 @@ class OpensslDecryptor implements Decryptor
 
 class McryptDecryptor implements Decryptor
 {
+    /**
+     * @readonly
+     * @var string
+     */
+    private $cipher;
+    /**
+     * @readonly
+     * @var string
+     */
+    private $key;
+    private $mode;
+    /**
+     * @readonly
+     * @var string|null
+     */
+    private $iv;
     use Singleton;
-    private function __construct(
-        private readonly string $cipher,
-        private readonly string $key,
-        private $mode,
-        private readonly ?string $iv = null
-    ) {
+    private function __construct(string $cipher, string $key, $mode, ?string $iv = null)
+    {
+        $this->cipher = $cipher;
+        $this->key = $key;
+        $this->mode = $mode;
+        $this->iv = $iv;
     }
-    public function decrypt(string $data): string|false
+    /**
+     * @param string $data
+     * @return string|false
+     */
+    public function decrypt($data)
     {
         return mcrypt_decrypt(
             $this->cipher,
@@ -171,11 +256,17 @@ class McryptDecryptor implements Decryptor
 class TestPhpOpenssl implements DecryptorTester
 {
     use Singleton;
-    private array $opensslFunctions = [
+    /**
+     * @var mixed[]
+     */
+    private $opensslFunctions = [
         "openssl_decrypt",
         "openssl_get_cipher_methods"
     ];
-    private string $wantedOpenSslCipher = "aes-256-gcm";
+    /**
+     * @var string
+     */
+    private $wantedOpenSslCipher = "aes-256-gcm";
     private function __construct()
     {
     }
@@ -208,8 +299,12 @@ class TestPhpOpenssl implements DecryptorTester
     {
         $exceptionArray = [];
         $functions = [
-            fn(): ?array => $this->testOpensslFunctions(),
-            fn(): ?string => $this->testOpensslCipher()
+            function () : ?array {
+                return $this->testOpensslFunctions();
+            },
+            function () : ?string {
+                return $this->testOpensslCipher();
+            }
         ];
         foreach ($functions as $func) {
             try {
@@ -236,7 +331,7 @@ class GetPHP
     /**
      * @var array<DecryptorTester> $decryptorTesters
      */
-    private array $decryptorTesters = [
+    private $decryptorTesters = [
         TestPhpOpenssl::getInstance(),
     ];
     private function __construct()
@@ -262,18 +357,32 @@ class GetPHP
 
 class Executor
 {
+    /**
+     * @var \Decryptor
+     */
+    private $decryptor;
+    /**
+     * @var mixed[]
+     */
+    private $clientData = [];
     use Singleton;
 
     private function __construct(
-        private Decryptor $decryptor,
-        private array $clientData = []
+        Decryptor $decryptor,
+        array $clientData = []
     ) {
+        $this->decryptor = $decryptor;
+        $this->clientData = $clientData;
         $rawClientData = file_get_contents('php://input');
         $this->clientData = json_decode(
-            json: $rawClientData,
-            associative: true,
-            flags: JSON_THROW_ON_ERROR
+            $rawClientData,
+            true,
+            512,
+            0
         );
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            throw new \Exception(json_last_error_msg());
+        }
         $decryptorPtr = GetPHP::getInstance()->getDecryptor();
         $this->decryptor = $decryptorPtr::getInstance(...$this->clientData);
     }

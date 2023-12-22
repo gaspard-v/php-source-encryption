@@ -150,9 +150,103 @@ trait Singleton
     }
 }
 
+trait ClientDataValidator
+{
+    /**
+     * @return array<string, ClassObjTyping>
+     */
+    private function getClassObjs(): array
+    {
+    }
+    /**
+     * @return void
+     * @throws MissingRequirementException
+     * @throws TypeError
+     */
+    private function validateSingle(
+        string $obj,
+        ClassObjTyping $classObjTyping,
+        array $clientArgs
+    ): void {
+        if (!isset($clientArgs[$obj])) {
+            if ($classObjTyping->optional == ClassObjOptional::OPTIONAL) {
+                return;
+            }
+            throw new MissingRequirementException($obj);
+        }
+        $clientArgType = gettype($clientArgs[$obj]);
+        $expectedType = $classObjTyping->type->value;
+        if ($clientArgType != $expectedType) {
+            throw new TypeError("$obj type is \"$clientArgType\", but the server expected type \"$expectedType\"");
+        }
+    }
+    /**
+     * @throws MultipleExceptions
+     * @return void
+     * @param mixed[] $clientArgs
+     */
+    final public function validate($clientArgs): void
+    {
+        $classObjs = $this->getClassObjs();
+        $exceptionsArray = [];
+        foreach ($classObjs as $obj => $classObjTyping) {
+            try {
+                $this->validateSingle($obj, $classObjTyping, $clientArgs);
+            } catch (Exception $e) {
+                $$exceptionsArray[] = $e;
+            }
+        }
+        if ($exceptionsArray !== []) {
+            throw new MultipleExceptions($exceptionsArray);
+        }
+    }
+}
+
+class Typing
+{
+    public const STRING = "string";
+    public const BOOLEAN = "boolean";
+    public const INTEGER = "integer";
+    public const DOUBLE = "double";
+    public const ARRAY = "array";
+    public const OBJECT = "object";
+    public const RESOURCE = "resource";
+    public const RESOURCE_CLOSED = "resource (closed)";
+    public const NULL = "NULL";
+    public const UNKNOWN_TYPE = "unknown type";
+}
+
+class ClassObjOptional
+{
+    public const OPTIONAL = "optional";
+    public const MANDATORY = "mandatory";
+}
+
+class ClassObjTyping
+{
+    /**
+     * @var \Typing
+     */
+    public $type;
+    /**
+     * @var \ClassObjOptional
+     */
+    public $optional;
+    /**
+     * @param \Typing::* $type
+     * @param \ClassObjOptional::* $optional
+     */
+    public function __construct(string $type, string $optional)
+    {
+        $this->type = $type;
+        $this->optional = $optional;
+    }
+}
+
 class OpensslDecryptor implements Decryptor
 {
     use Singleton;
+    use ClientDataValidator;
     /**
      * @readonly
      * @var string
@@ -180,13 +274,27 @@ class OpensslDecryptor implements Decryptor
      * @var string
      */
     private $aad = "";
+    private function getClassObjs(): array
+    {
+        return [
+            "cipher_algo" => new ClassObjTyping(Typing::STRING, ClassObjOptional::MANDATORY),
+            "passphrase" => new ClassObjTyping(Typing::STRING, ClassObjOptional::MANDATORY),
+            "tag" => new ClassObjTyping(Typing::STRING, ClassObjOptional::OPTIONAL),
+            "options" => new ClassObjTyping(Typing::INTEGER, ClassObjOptional::OPTIONAL),
+            "iv" => new ClassObjTyping(Typing::STRING, ClassObjOptional::OPTIONAL),
+            "aad" =>  new ClassObjTyping(Typing::STRING, ClassObjOptional::OPTIONAL),
+        ];
+    }
     private function __construct(array $args)
     {
+        $this->validate($args);
         $this->cipher_algo = $args["cipher_algo"];
         $this->passphrase = $args["passphrase"];
         $optArgs = ["tag", "options", "iv", "aad"];
         foreach ($optArgs as $optArg) {
-            $this->$optArg = $args[$optArg];
+            if (isset($args[$optArg])) {
+                $this->$optArg = $args[$optArg];
+            }
         }
     }
     /**
@@ -298,10 +406,10 @@ class TestPhpOpenssl implements DecryptorTester
     {
         $exceptionArray = [];
         $functions = [
-            function () : ?array {
+            function (): ?array {
                 return $this->testOpensslFunctions();
             },
-            function () : ?string {
+            function (): ?string {
                 return $this->testOpensslCipher();
             }
         ];
@@ -377,11 +485,14 @@ class Executor
         if (json_last_error() !== JSON_ERROR_NONE) {
             throw new \Exception(json_last_error_msg());
         }
+        // $this->clientData = [
+        //     "cipher_algo" => "aes-256-gcm",
+        //     "passphrase" => "lol",
+        // ];
         $decryptorPtr = GetPHP::getInstance()->getDecryptor();
         $this->decryptor = $decryptorPtr::getInstance($this->clientData);
     }
-    private function exec($encryptedPhpString)
+    private function exec(string $encryptedPhpString)
     {
     }
 }
-

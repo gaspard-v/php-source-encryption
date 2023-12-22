@@ -119,46 +119,74 @@ trait Singleton
     }
 }
 
-// TODO
-// trait ClientDataValidator
-// {
-//     /**
-//      * @return ClassObjTyping[]
-//      */
-//     abstract private function getClassObjs(): array;
-//     final public function validate(array $clientArgs)
-//     {
-//         $classObjs = $this->getClassObjs();
-//         foreach ($classObjs as $obj => $classObjOptional) {
-//             $classObj
-//         }
-//     }
-// }
-
-abstract class Typing
+trait ClientDataValidator
 {
-    static public string $string = "string";
-    static public string $boolean = "boolean";
-    static public string $integer = "integer";
-    static public string $double = "double";
-    static public string $array = "array";
-    static public string $object = "object";
-    static public string $resource = "resource";
-    static public string $resource_closed = "resource (closed)";
-    static public string $NULL = "NULL";
-    static public string $unknown_type = "unknown type";
+    /**
+     * @return array<string, ClassObjTyping>
+     */
+    abstract private function getClassObjs(): array;
+    /**
+     * @return void
+     * @throws MissingRequirementException
+     * @throws TypeError
+     */
+    final private function validateSingle(
+        string $obj,
+        ClassObjTyping $classObjTyping,
+        array $clientArgs
+    ): void {
+        if (!isset($clientArgs[$obj])) {
+            if ($classObjTyping->optional == ClassObjOptional::OPTIONAL) {
+                return;
+            }
+            throw new MissingRequirementException($obj);
+        }
+        $clientArgType = gettype($clientArgs[$obj]);
+        $expectedType = $classObjTyping->type->value;
+        if ($clientArgType != $expectedType) {
+            throw new TypeError("$obj type is \"$clientArgType\", but the server expected type \"$expectedType\"");
+        }
+    }
+    /**
+     * @throws MultipleExceptions
+     * @return void
+     */
+    final public function validate(array $clientArgs): void
+    {
+        $classObjs = $this->getClassObjs();
+        $exceptionsArray = [];
+        foreach ($classObjs as $obj => $classObjTyping) {
+            $this->validateSingle($obj, $classObjTyping, $clientArgs);
+        }
+        if ($exceptionsArray)
+            throw new MultipleExceptions($exceptionsArray);
+    }
 }
 
-abstract class ClassObjOptional
+enum Typing: string
 {
-    static public string $optional = "optional";
-    static public string $mandatory = "mandatory";
+    case STRING = "string";
+    case BOOLEAN = "boolean";
+    case INTEGER = "integer";
+    case DOUBLE = "double";
+    case ARRAY = "array";
+    case OBJECT = "object";
+    case RESOURCE = "resource";
+    case RESOURCE_CLOSED = "resource (closed)";
+    case NULL = "NULL";
+    case UNKNOWN_TYPE = "unknown type";
+}
+
+enum ClassObjOptional: string
+{
+    case OPTIONAL = "optional";
+    case MANDATORY = "mandatory";
 }
 
 class ClassObjTyping
 {
-    public string $type;
-    public string $optional;
+    public Typing $type;
+    public ClassObjOptional $optional;
 }
 
 class OpensslDecryptor implements Decryptor

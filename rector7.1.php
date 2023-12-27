@@ -8,7 +8,7 @@ use Rector\Set\ValueObject\DowngradeLevelSetList;
 
 
 return static function (RectorConfig $rectorConfig): void {
-    $rectorConfig->phpVersion(PhpVersion::PHP_83);
+    $rectorConfig->phpVersion(PhpVersion::PHP_71);
     $rectorConfig->rule(TypedPropertyFromStrictConstructorRector::class);
     $rectorConfig->paths([
         __DIR__ . DIRECTORY_SEPARATOR . "src71",

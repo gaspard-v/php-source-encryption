@@ -1,6 +1,20 @@
 <?php
 
 declare(strict_types=1);
+
+function exception_handler(Throwable $exception)
+{
+    $currentDate = new DateTime();
+    $errorObj = [
+        "timestamp" => $currentDate->format('c'),
+        "error" => get_class($exception),
+        "message" => $exception->getMessage(),
+    ];
+    header('Content-Type: application/json');
+    echo json_encode($errorObj);
+}
+
+set_exception_handler('exception_handler');
 class MultipleExceptions extends Exception
 {
     public function __construct(
@@ -20,7 +34,7 @@ class MultipleExceptions extends Exception
                 $message .= "Exception does not have a message...";
                 continue;
             }
-            $message .=  "\"{$exception->getMessage()}\" ";
+            $message .=  "\"{$exception->getMessage()}\" \n";
         }
         return $message;
     }

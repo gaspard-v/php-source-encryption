@@ -278,16 +278,13 @@ class McryptDecryptor implements Decryptor
     private readonly string $cipher;
     private readonly string $key;
     private $mode;
-    private readonly ?string $iv;
+    private readonly string $iv;
     private function __construct(array $args)
     {
         $this->cipher = $args["cipher"];
         $this->key = $args["key"];
         $this->mode = $args["mode"];
-        $optArgs = ["iv"];
-        foreach ($optArgs as $optArg) {
-            $this->$optArg = $args[$optArg];
-        }
+        $this->iv = $args["iv"];
     }
     public function decrypt(string $data): string|false
     {

@@ -1,0 +1,8 @@
+parameters:
+    level: 4
+    paths:
+        - src
+        - src71
+        - tests
+    scanDirectories:
+        - utils

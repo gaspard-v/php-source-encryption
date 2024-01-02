@@ -1,9 +1,8 @@
 <?php
 
-declare(strict_types=1);
+// declare(strict_types=1);
 
-function exception_handler(Throwable $exception)
-{
+set_exception_handler(function (Throwable $exception): void {
     $currentDate = new DateTime();
     $errorObj = [
         "timestamp" => $currentDate->format('c'),
@@ -17,9 +16,7 @@ function exception_handler(Throwable $exception)
     }
     http_response_code($response_code);
     echo json_encode($errorObj);
-}
-
-set_exception_handler('exception_handler');
+});
 
 class UserException extends Exception
 {
@@ -447,7 +444,7 @@ class Executor
         if (!$this->command) {
             return $evalReturn;
         }
-        if (!function_exists($this->command)) {
+        if (!is_callable($this->command)) {
             throw new UserException("function {$this->command} does not exist");
         }
         return call_user_func($this->command, $this->parameters);

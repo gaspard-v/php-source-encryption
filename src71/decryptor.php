@@ -1,9 +1,8 @@
 <?php
 
-declare(strict_types=1);
+// declare(strict_types=1);
 
-function exception_handler(Throwable $exception)
-{
+set_exception_handler(function (Throwable $exception): void {
     $currentDate = new DateTime();
     $errorObj = [
         "timestamp" => $currentDate->format('c'),
@@ -17,9 +16,7 @@ function exception_handler(Throwable $exception)
     }
     http_response_code($response_code);
     echo json_encode($errorObj);
-}
-
-set_exception_handler('exception_handler');
+});
 
 class UserException extends Exception
 {
@@ -365,7 +362,7 @@ class McryptDecryptor implements Decryptor
     private $mode;
     /**
      * @readonly
-     * @var string|null
+     * @var string
      */
     private $iv;
     private function __construct(array $args)
@@ -373,10 +370,7 @@ class McryptDecryptor implements Decryptor
         $this->cipher = $args["cipher"];
         $this->key = $args["key"];
         $this->mode = $args["mode"];
-        $optArgs = ["iv"];
-        foreach ($optArgs as $optArg) {
-            $this->$optArg = $args[$optArg];
-        }
+        $this->iv = $args["iv"];
     }
     /**
      * @param string $data
@@ -569,7 +563,7 @@ class Executor
         if (!$this->command) {
             return $evalReturn;
         }
-        if (!function_exists($this->command)) {
+        if (!is_callable($this->command)) {
             throw new UserException("function {$this->command} does not exist");
         }
         return call_user_func($this->command, $this->parameters);

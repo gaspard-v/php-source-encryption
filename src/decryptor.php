@@ -43,7 +43,7 @@ class MultipleExceptions extends Exception
                 $message .= "Exception does not have a message...";
                 continue;
             }
-            $message .=  "\"{$exception->getMessage()}\" \n";
+            $message .= "\"{$exception->getMessage()}\" \n";
         }
         return $message;
     }
@@ -129,7 +129,7 @@ trait Singleton
     private function __construct()
     {
     }
-    final protected function  __clone()
+    final protected function __clone()
     {
     }
     final public static function getInstance(...$args): self
@@ -240,7 +240,7 @@ class OpensslDecryptor implements Decryptor
             "tag" => new ClassObjTyping(Typing::STRING, ClassObjOptional::MANDATORY),
             "options" => new ClassObjTyping(Typing::INTEGER, ClassObjOptional::OPTIONAL),
             "iv" => new ClassObjTyping(Typing::STRING, ClassObjOptional::MANDATORY),
-            "aad" =>  new ClassObjTyping(Typing::STRING, ClassObjOptional::OPTIONAL),
+            "aad" => new ClassObjTyping(Typing::STRING, ClassObjOptional::OPTIONAL),
         ];
     }
     private function __construct(array $args)
@@ -337,8 +337,8 @@ class TestPhpOpenssl implements DecryptorTester
     {
         $exceptionArray = [];
         $functions = [
-            fn (): ?array => $this->testOpensslFunctions(),
-            fn (): ?string => $this->testOpensslCipher()
+            fn(): ?array => $this->testOpensslFunctions(),
+            fn(): ?string => $this->testOpensslCipher()
         ];
         foreach ($functions as $func) {
             try {
@@ -397,7 +397,7 @@ class Executor
     private function getClassObjs(): array
     {
         return [
-            "decryptor" => new ClassObjTyping(Typing::ARRAY, ClassObjOptional::MANDATORY),
+            "decryptor" => new ClassObjTyping(Typing::ARRAY , ClassObjOptional::MANDATORY),
         ];
     }
     private function __construct()
@@ -414,8 +414,8 @@ class Executor
         }
         try {
             $this->validate($clientData);
-        } catch (Exception) {
-            throw new UserException("fail to validate send data");
+        } catch (Exception $e) {
+            throw new UserException("fails to validate data", $e);
         }
         $this->decryptorData = $clientData["decryptor"];
         $decryptorPtr = GetPHP::getInstance()->getDecryptor();

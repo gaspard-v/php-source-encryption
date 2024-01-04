@@ -200,6 +200,9 @@ trait ClientDataValidator
         }
         $clientArgType = gettype($clientArgs[$obj]);
         $expectedType = $classObjTyping->type->value;
+        if ($expectedType === null) {
+            $expectedType = $classObjTyping->type;
+        }
         if ($clientArgType != $expectedType) {
             throw new TypeError("$obj type is \"$clientArgType\", but the server expected type \"$expectedType\"");
         }
@@ -207,10 +210,13 @@ trait ClientDataValidator
     /**
      * @throws MultipleExceptions
      * @return void
-     * @param mixed[] $clientArgs
+     * @param mixed[]|null $clientArgs
      */
     final public function validate($clientArgs): void
     {
+        if (!$clientArgs) {
+            throw new UserException("Data must be provided");
+        }
         $classObjs = $this->getClassObjs();
         $exceptionsArray = [];
         foreach ($classObjs as $obj => $classObjTyping) {

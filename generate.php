@@ -20,10 +20,16 @@ if (!$phpSourceFile) {
     exit(1);
 }
 
+echo "Target Php Version: $targetPhpVersion\nPhp Source File: $phpSourceFile\n";
+
 $finalBuildFile = __DIR__ . DIRECTORY_SEPARATOR . "build.php";
 $intermediateBuildFile = __DIR__ . DIRECTORY_SEPARATOR . "intermediate.php";
 $sourceBuildFile = __DIR__ . DIRECTORY_SEPARATOR . "source_build.php";
-unlink($finalBuildFile);
+
+if (file_get_contents($finalBuildFile)) {
+    echo "file $finalBuildFile exists and has content, exiting ...\n";
+    exit(0);
+}
 unlink($intermediateBuildFile);
 unlink($sourceBuildFile);
 

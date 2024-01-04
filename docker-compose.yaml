@@ -10,8 +10,27 @@ services:
       - ./build.php:/var/www/html/index.php
     depends_on:
       - php
+    networks:
+      - php-encryption
 
   php:
-    image: php:8.3-fpm
+    image: php:${PHP_FPM_VERSION:-8.3}-fpm
     volumes:
       - ./build.php:/var/www/html/index.php
+    depends_on:
+      - builder
+    networks:
+      - php-encryption
+
+  builder:
+    image: php-source-encryption-builder:latest
+    build:
+      context: .
+    env_file:
+      - .env
+    volumes:
+      - ./test.php:/app/index.php
+      - ./build.php:/app/build.php
+
+networks:
+  php-encryption:

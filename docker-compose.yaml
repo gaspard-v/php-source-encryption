@@ -23,7 +23,7 @@ services:
       - php-encryption
 
   builder:
-    image: php-source-encryption-builder:latest
+    image: xosh/php-source-encryption-builder:latest
     build:
       context: .
     env_file:

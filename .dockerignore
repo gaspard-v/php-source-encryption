@@ -1,0 +1,7 @@
+vendor/
+build/
+build.php
+test.php
+.git/
+.devcontainer/
+.vscode/

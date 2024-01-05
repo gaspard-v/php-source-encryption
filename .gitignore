@@ -2,3 +2,4 @@
 vendor/
 build.php
 .env
+src_build/

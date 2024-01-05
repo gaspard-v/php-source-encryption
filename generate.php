@@ -2,19 +2,12 @@
 
 $targetPhpVersion = getenv("TARGET_PHP_VERSION");
 $phpSourceFile = getenv("PHP_SOURCE_FILE");
-$availiblePhpVersion = [
-    "7" => "src71",
-    "8" => "src"
-];
+
 if (!$targetPhpVersion) {
     echo "Environment variable \"TARGET_PHP_VERSION\" must be set";
     exit(1);
 }
 
-if (!array_key_exists($targetPhpVersion, $availiblePhpVersion)) {
-    echo "Environment variable \"TARGET_PHP_VERSION\" value must be \"7\" or \"8\"";
-    exit(1);
-}
 if (!$phpSourceFile) {
     echo "Environment variable \"PHP_SOURCE_FILE\" must be set";
     exit(1);
@@ -33,9 +26,9 @@ if (file_get_contents($finalBuildFile)) {
 unlink($intermediateBuildFile);
 unlink($sourceBuildFile);
 
-require_once "rector.php";
+passthru(__DIR__ . DIRECTORY_SEPARATOR . "vendor/bin/rector");
 $decryptorFile = __DIR__ . DIRECTORY_SEPARATOR .
-    $availiblePhpVersion[$targetPhpVersion] .
+    "src_build" .
     DIRECTORY_SEPARATOR .
     "decryptor.php";
 

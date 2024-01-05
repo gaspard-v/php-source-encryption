@@ -14,7 +14,7 @@ services:
       - php-encryption
 
   php:
-    image: php:${PHP_FPM_VERSION:-8.3}-fpm
+    image: php:${TARGET_PHP_VERSION}-fpm
     volumes:
       - ./build.php:/var/www/html/index.php
     depends_on:

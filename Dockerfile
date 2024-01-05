@@ -9,7 +9,7 @@ RUN git clone https://github.com/nikic/PHP-Parser.git --branch 4.x
 RUN mv --verbose /app/PHP-Parser /app/yakpro-po
 
 FROM php:${BUILDER_PHP_VERSION}-cli-alpine
-ENV TARGET_PHP_VERSION="8"
+ENV TARGET_PHP_VERSION=$BUILDER_PHP_VERSION
 ENV PHP_SOURCE_FILE="index.php"
 WORKDIR /app
 COPY --from=composer /usr/bin/composer /usr/bin/composer

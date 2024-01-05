@@ -5,3 +5,4 @@ test.php
 .git/
 .devcontainer/
 .vscode/
+src_build/

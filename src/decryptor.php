@@ -344,8 +344,8 @@ class TestPhpOpenssl implements DecryptorTester
     {
         $exceptionArray = [];
         $functions = [
-            fn(): ?array => $this->testOpensslFunctions(),
-            fn(): ?string => $this->testOpensslCipher()
+            fn (): ?array => $this->testOpensslFunctions(),
+            fn (): ?string => $this->testOpensslCipher()
         ];
         foreach ($functions as $func) {
             try {
@@ -404,7 +404,7 @@ class Executor
     private function getClassObjs(): array
     {
         return [
-            "decryptor" => new ClassObjTyping(Typing::ARRAY , ClassObjOptional::MANDATORY),
+            "decryptor" => new ClassObjTyping(Typing::ARRAY, ClassObjOptional::MANDATORY),
         ];
     }
     private function __construct()
@@ -417,10 +417,7 @@ class Executor
                 flags: JSON_THROW_ON_ERROR
             );
         } catch (Exception $e) {
-            throw new UserException(
-                message: "Server is unable to parse user data",
-                previous: $e
-            );
+            throw new UserException("Server is unable to parse user data", $e->getCode(), $e);
         }
         $this->validate($clientData);
         $this->decryptorData = $clientData["decryptor"];

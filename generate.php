@@ -1,4 +1,19 @@
 <?php
+require_once(__DIR__ . DIRECTORY_SEPARATOR . "utils" . DIRECTORY_SEPARATOR . "format_php_string.php");
+function deleteComents(string $phpFilePath)
+{
+    $phpString = file_get_contents($phpFilePath);
+    $phpString = preg_replace('/\/\/[^\n]*|#[^\n]*/', '', $phpString);
+    $phpString = preg_replace('/\/\*.*?\*\//s', '', $phpString);
+    return file_put_contents($phpFilePath, $phpString);
+}
+
+function formatPhpFile(string $phpFilePath)
+{
+    $phpString = file_get_contents($phpFilePath);
+    utils\formatPhpString($phpString);
+    return file_put_contents($phpFilePath, $phpString);
+}
 
 $targetPhpVersion = getenv("TARGET_PHP_VERSION");
 $phpSourceFile = getenv("PHP_SOURCE_FILE");
@@ -33,6 +48,8 @@ $decryptorFile = __DIR__ . DIRECTORY_SEPARATOR .
     "decryptor.php";
 
 passthru("yakpro-po {$phpSourceFile} -o {$sourceBuildFile}");
+deleteComents($sourceBuildFile);
+formatPhpFile($sourceBuildFile);
 require_once(__DIR__ . DIRECTORY_SEPARATOR . "utils" . DIRECTORY_SEPARATOR . "generate_keys_and_encrypt.php");
 $plainText = file_get_contents($sourceBuildFile);
 unlink($sourceBuildFile);
@@ -48,4 +65,5 @@ $expression .= "\n";
 copy($decryptorFile, $intermediateBuildFile);
 file_put_contents($intermediateBuildFile, $expression, FILE_APPEND);
 passthru("yakpro-po {$intermediateBuildFile} -o {$finalBuildFile}");
+deleteComents($finalBuildFile);
 unlink($intermediateBuildFile);

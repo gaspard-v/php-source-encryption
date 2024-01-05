@@ -2,11 +2,13 @@
 
 set_exception_handler(function (Throwable $exception): void {
     $currentDate = new DateTime();
+    $errorStackMessages = [$exception->getMessage()];
+    while ($previous = $exception->getPrevious()) {
+        $errorStackMessages[] = $previous->getMessage();
+    }
     $errorObj = [
         "timestamp" => $currentDate->format('c'),
-        "error_type" => $exception::class,
-        "error_message" => $exception->getMessage(),
-        "error_stack_trace" => $exception->getTraceAsString(),
+        "error_messages" => $errorStackMessages
     ];
     header('Content-Type: application/json');
     $response_code = 500;
@@ -24,6 +26,7 @@ class UserException extends Exception
         parent::__construct($message, $code, $previous);
     }
 }
+
 class MultipleExceptions extends Exception
 {
     public function __construct(
@@ -53,6 +56,7 @@ class MultipleExceptions extends Exception
         return $this->exceptions;
     }
 }
+
 class UncallableFunctionException extends Exception
 {
     public function __construct(
@@ -171,13 +175,13 @@ trait ClientDataValidator
         }
     }
     /**
-     * @throws MultipleExceptions
+     * @throws UserException
      * @return void
      */
     final public function validate(?array $clientArgs): void
     {
         if (!$clientArgs) {
-            throw new UserException("Data must be provided");
+            throw new UserException("Client did not provide any data");
         }
         $classObjs = $this->getClassObjs();
         $exceptionsArray = [];
@@ -189,7 +193,10 @@ trait ClientDataValidator
             }
         }
         if ($exceptionsArray !== []) {
-            throw new MultipleExceptions($exceptionsArray);
+            throw new UserException(
+                message: "Fails to validate use data",
+                previous: new MultipleExceptions($exceptionsArray)
+            );
         }
     }
 }
@@ -384,7 +391,7 @@ class GetPHP
         if ($exceptions !== []) {
             throw new MultipleExceptions($exceptions);
         }
-        throw new MissingRequirementException("There's no decryptor!");
+        throw new MissingRequirementException("No decryptors are available");
     }
 }
 
@@ -410,13 +417,12 @@ class Executor
                 flags: JSON_THROW_ON_ERROR
             );
         } catch (Exception $e) {
-            throw new UserException($e->getMessage(), $e->getCode(), $e);
+            throw new UserException(
+                message: "Server is unable to parse user data",
+                previous: $e
+            );
         }
-        try {
-            $this->validate($clientData);
-        } catch (Exception $e) {
-            throw new UserException("fails to validate data", $e);
-        }
+        $this->validate($clientData);
         $this->decryptorData = $clientData["decryptor"];
         $decryptorPtr = GetPHP::getInstance()->getDecryptor();
         $this->decryptor = $decryptorPtr::getInstance($this->decryptorData);
